@@ -1,33 +1,41 @@
-AWS CloudTrail Logging Solution
-This CloudFormation template sets up a CloudTrail Trail to log and monitor AWS API activity, and stores the logs in an S3 bucket. The CloudFormation template creates an S3 bucket, a CloudTrail Trail, a CloudWatch Logs Log Group, and an IAM Role for CloudTrail to access resources.
+# CloudTrail and CloudWatch Logs with S3 and IAM Role
 
-Prerequisites
-Before deploying this CloudFormation stack, you need:
+This CloudFormation template deploys the necessary resources for logging AWS API activity with CloudTrail, storing logs in S3, and enabling CloudWatch Logs for centralized logging.
 
-An AWS account with permissions to create CloudFormation stacks, S3 buckets, CloudTrail Trails, CloudWatch Logs, and IAM Roles.
-Basic knowledge of CloudFormation, AWS CloudTrail, AWS S3, CloudWatch Logs, and IAM.
-A local environment with AWS CLI and AWS SAM CLI installed.
-Deployment
-To deploy this CloudFormation stack, follow these steps:
+## Services Deployed
 
-Clone the repository to your local environment.
-Change to the cloned directory: cd aws-cloudtrail-logging-solution.
-Create an S3 bucket to store the CloudFormation deployment package: aws s3 mb s3://<your-bucket-name>.
-Package the CloudFormation template and upload it to the S3 bucket: aws cloudformation package --template-file cloudtrail.yaml --s3-bucket <your-bucket-name> --output-template-file packaged.yaml.
-Deploy the CloudFormation stack: aws cloudformation deploy --stack-name <your-stack-name> --template-file packaged.yaml --capabilities CAPABILITY_IAM.
-Wait for the CloudFormation stack to complete the deployment.
-Stack Outputs
-After the CloudFormation stack is deployed, it creates the following resources:
+- Amazon S3 bucket for storing CloudTrail logs
+- AWS CloudTrail trail with the following configuration:
+  - Logs all regions
+  - Includes global service events
+  - Logs to the S3 bucket created in this stack
+  - Validates log file integrity
+  - Configures CloudWatch Logs to receive CloudTrail logs
+  - Uses an IAM role for CloudTrail to access the S3 bucket and CloudWatch Logs
+- CloudWatch Logs log group for storing CloudTrail logs
+- IAM role for CloudTrail with the following permissions:
+  - Read and write access to the S3 bucket
+  - Read and write access to the CloudWatch Logs log group
 
-S3Bucket: The name of the S3 bucket that stores the CloudTrail logs.
-CloudTrailTrail: The ARN of the CloudTrail Trail.
-CloudTrailLogGroup: The ARN of the CloudWatch Logs Log Group.
-CloudTrailLogRole: The ARN of the IAM Role for CloudTrail.
-Removal
-To remove the CloudFormation stack, run the following command: aws cloudformation delete-stack --stack-name <your-stack-name>. This will delete all resources created by the stack.
+## How to Deploy
 
-License
-This code is licensed under the MIT License. See the LICENSE file for more information.
+1. Download the `cloudtrail_analytics.yml` file from this repository
+2. In the AWS Management Console, navigate to CloudFormation
+3. Click "Create Stack"
+4. Select "Upload a template file"
+5. Click "Choose file" and select the `cloudtrail_analytics.yml` file you downloaded in step 1
+6. Click "Next"
+7. Enter a name for your stack and any other required parameters
+8. Click "Next"
+9. Review the stack details and click "Create stack"
 
-Credits
-This CloudFormation template was created by evans-nyang. If you have any feedback or suggestions, please submit an issue or pull request.
+## Diagram
+
+![CloudTrail Analytics](https://github.com/evans-nyang/cloudtrail_analytics/blob/main/images/cloudtrail_analytics-designer.png?raw=true)
+
+This diagram shows the following components:
+
+- CloudTrail Trail: logs AWS API activity and sends the logs to CloudWatch Logs and S3.
+- CloudWatch Logs Log Group: stores the CloudTrail logs received from CloudTrail.
+- S3 Bucket: stores the CloudTrail logs received from CloudTrail.
+- IAM Role for CloudTrail: provides permissions for CloudTrail to access resources such as S3 and CloudWatch Logs.
