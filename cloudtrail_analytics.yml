@@ -1,0 +1,59 @@
+AWSTemplateFormatVersion: 2010-09-09
+Resources:
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: my-cloudtrail-logs
+  CloudTrailTrail:
+    Type: AWS::CloudTrail::Trail
+    Properties:
+      IsLogging: true
+      S3BucketName: !Ref S3Bucket
+      S3KeyPrefix: cloudtrail-logs/
+      IncludeGlobalServiceEvents: true
+      IsMultiRegionTrail: true
+      EnableLogFileValidation: true
+      CloudWatchLogsLogGroupArn: !GetAtt CloudTrailLogGroup.Arn
+      CloudWatchLogsRoleArn: !GetAtt CloudTrailLogRole.Arn
+      Tags:
+        - Key: Name
+          Value: MyCloudTrailTrail
+  CloudTrailLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/cloudtrail/MyCloudTrailTrail
+      RetentionInDays: 365
+      Tags:
+        - Key: Name
+          Value: MyCloudTrailTrailLogGroup
+  CloudTrailLogRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: MyCloudTrailTrailRole
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: cloudtrail.amazonaws.com
+            Action: sts:AssumeRole
+      Path: /
+      Policies:
+        - PolicyName: MyCloudTrailTrailPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetBucketAcl
+                  - s3:PutObject
+                  - s3:GetObject
+                  - s3:GetBucketLocation
+                Resource: !Sub "arn:aws:s3:::${S3Bucket}"
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                  - logs:DescribeLogStreams
+                  - logs:GetLogEvents
+                Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/cloudtrail/MyCloudTrailTrail:*"
