@@ -57,3 +57,15 @@ Resources:
                   - logs:DescribeLogStreams
                   - logs:GetLogEvents
                 Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/cloudtrail/MyCloudTrailTrail:*"
+  AthenaBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: trail-athena-bucket
+      AccessControl: Private
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      Tags:
+        - Key: Environment
+          Value: Development
