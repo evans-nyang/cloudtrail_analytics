@@ -1,9 +1,40 @@
 AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+  S3Bucketname:
+    Type: String
+    Default: my-cloudtrail-logs
+  Trailname:
+    Type: String
+    Default: MyCloudTrailTrail
+  LogGroupTag:
+    Type: String
+    Default: MyCloudTrailTrailLogGroup
+  LogGroupname:
+    Type: String
+    Default: /aws/cloudtrail/MyCloudTrailTrail
+  Rolename:
+    Type: String
+    Default: MyCloudTrailTrailRole
+  TrailPolicyname:
+    Type: String
+    Default: MyCloudTrailTrailPolicy
+  AthenaBucketname:
+    Type: String
+    Default: trail-athena-bucket
+  AthenaDBname:
+    Type: String
+    Default: trail_database
+  AthenaTablename:
+    Type: String
+    Default: cloudtrail_logs
+
 Resources:
   S3Bucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: my-cloudtrail-logs
+      BucketName: !Ref S3Bucketname
+
   CloudTrailTrail:
     Type: AWS::CloudTrail::Trail
     Properties:
@@ -17,19 +48,19 @@ Resources:
       CloudWatchLogsRoleArn: !GetAtt CloudTrailLogRole.Arn
       Tags:
         - Key: Name
-          Value: MyCloudTrailTrail
+          Value: !Ref Trailname
   CloudTrailLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: /aws/cloudtrail/MyCloudTrailTrail
+      LogGroupName: !Ref LogGroupname
       RetentionInDays: 365
       Tags:
         - Key: Name
-          Value: MyCloudTrailTrailLogGroup
+          Value: !Ref LogGroupTag
   CloudTrailLogRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: MyCloudTrailTrailRole
+      RoleName: !Ref Rolename
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -39,7 +70,7 @@ Resources:
             Action: sts:AssumeRole
       Path: /
       Policies:
-        - PolicyName: MyCloudTrailTrailPolicy
+        - PolicyName: !Ref TrailPolicyname
           PolicyDocument:
             Version: "2012-10-17"
             Statement:
@@ -57,10 +88,11 @@ Resources:
                   - logs:DescribeLogStreams
                   - logs:GetLogEvents
                 Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/cloudtrail/MyCloudTrailTrail:*"
+
   AthenaBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: trail-athena-bucket
+      BucketName: !Ref AthenaBucketname
       AccessControl: Private
       BucketEncryption:
         ServerSideEncryptionConfiguration:
@@ -69,3 +101,71 @@ Resources:
       Tags:
         - Key: Environment
           Value: Development
+  AthenaDatabase:
+    Type: AWS::Athena::NamedQuery
+    Properties:
+      Database: default
+      Name: CreateTrailDatabase
+      Description: Creates a database for trail data
+      QueryString: >
+        CREATE DATABASE IF NOT EXISTS trail_database
+        COMMENT 'This is a database for trail data'
+        LOCATION 's3://trail-athena-bucket/trail-data/'
+  AthenaTable:
+    Type: AWS::Athena::NamedQuery
+    Properties:
+      Database: !Ref AthenaDBname
+      Name: !Ref AthenaTablename
+      Description: CloudTrail logs
+      QueryString: >
+        CREATE EXTERNAL TABLE IF NOT EXISTS cloudtrail_logs (
+          eventVersion STRING,
+          userIdentity STRUCT<
+            type:STRING,
+            principalId:STRING,
+            arn:STRING,
+            accountId:STRING,
+            userName:STRING,
+            accessKeyId:STRING,
+            sessionContext:STRUCT<
+              attributes:STRUCT<
+                mfaAuthenticated:STRING,
+                creationDate:STRING>,
+              sessionIssuer:STRUCT<
+                type:STRING,
+                principalId:STRING,
+                arn:STRING,
+                accountId:STRING,
+                userName:STRING>>>,
+          eventTime STRING,
+          eventSource STRING,
+          eventName STRING,
+          awsRegion STRING,
+          sourceIPAddress STRING,
+          userAgent STRING,
+          errorCode STRING,
+          errorMessage STRING,
+          requestParameters STRING,
+          responseElements STRING,
+          additionalEventData STRING,
+          requestID STRING,
+          eventID STRING,
+          eventType STRING,
+          apiVersion STRING,
+          readOnly STRING,
+          recipientAccountId STRING,
+          serviceEventDetails STRING,
+          sharedEventID STRING,
+          vpcEndpointId STRING
+        )
+        ROW FORMAT SERDE 'com.amazon.emr.hive.serde.CloudTrailSerde'
+        STORED AS INPUTFORMAT 'com.amazon.emr.cloudtrail.CloudTrailInputFormat'
+        OUTPUTFORMAT 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat'
+        LOCATION 's3://my-cloudtrail-logs/cloudtrail-logs/'
+        TBLPROPERTIES (
+          'classification'='cloudtrail',
+          'creator'='my-aws-account-id',
+          'cloudtrail:LogFile'='CloudTrail/my_aws_account_id/MyCloudTrailTrail/my_aws_account_id_CloudTrail_MyCloudTrailTrail_20230102T1334Z_oSwKcEph1ZDBNSeC.json.gz',
+          'cloudtrail:TableName'='cloudtrail_logs',
+          'compressionType'='gzip'
+        );
