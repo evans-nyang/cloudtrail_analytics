@@ -101,7 +101,7 @@ Resources:
       Tags:
         - Key: Environment
           Value: Development
-  AthenaDatabase:
+  CreateTrailDatabase:
     Type: AWS::Athena::NamedQuery
     Properties:
       Database: default
@@ -116,59 +116,70 @@ Resources:
     Properties:
       Database: !Ref AthenaDBname
       Name: !Ref AthenaTablename
-      Description: CloudTrail logs
-      QueryString: >
-        CREATE EXTERNAL TABLE IF NOT EXISTS cloudtrail_logs (
-          eventVersion STRING,
-          userIdentity STRUCT<
-            type:STRING,
-            principalId:STRING,
-            arn:STRING,
-            accountId:STRING,
-            userName:STRING,
-            accessKeyId:STRING,
-            sessionContext:STRUCT<
-              attributes:STRUCT<
-                mfaAuthenticated:STRING,
-                creationDate:STRING>,
-              sessionIssuer:STRUCT<
-                type:STRING,
-                principalId:STRING,
-                arn:STRING,
-                accountId:STRING,
-                userName:STRING>>>,
-          eventTime STRING,
-          eventSource STRING,
-          eventName STRING,
-          awsRegion STRING,
-          sourceIPAddress STRING,
-          userAgent STRING,
-          errorCode STRING,
-          errorMessage STRING,
-          requestParameters STRING,
-          responseElements STRING,
-          additionalEventData STRING,
-          requestID STRING,
-          eventID STRING,
-          eventType STRING,
-          apiVersion STRING,
-          readOnly STRING,
-          recipientAccountId STRING,
-          serviceEventDetails STRING,
-          sharedEventID STRING,
-          vpcEndpointId STRING
-        )
-        ROW FORMAT SERDE 'com.amazon.emr.hive.serde.CloudTrailSerde'
-        STORED AS INPUTFORMAT 'com.amazon.emr.cloudtrail.CloudTrailInputFormat'
-        OUTPUTFORMAT 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat'
-        LOCATION 's3://my-cloudtrail-logs/cloudtrail-logs/'
-        TBLPROPERTIES (
-          'classification'='cloudtrail',
-          'creator'='my-aws-account-id',
-          'cloudtrail:LogFile'='CloudTrail/my_aws_account_id/MyCloudTrailTrail/my_aws_account_id_CloudTrail_MyCloudTrailTrail_20230102T1334Z_oSwKcEph1ZDBNSeC.json.gz',
-          'cloudtrail:TableName'='cloudtrail_logs',
-          'compressionType'='gzip'
-        );
+      Description: Creates a table for AWS CloudTrail logs in Athena
+      QueryString: !Sub
+        - >
+          CREATE EXTERNAL TABLE IF NOT EXISTS cloudtrail_logs (
+            eventVersion STRING,
+            userIdentity STRUCT<
+              type:STRING,
+              principalId:STRING,
+              arn:STRING,
+              accountId:STRING,
+              invokedBy:STRING,
+              accessKeyId:STRING,
+              userName:STRING,
+              sessionContext:STRUCT<
+                attributes:STRUCT<
+                  mfaAuthenticated:STRING,
+                  creationDate:STRING>,
+                sessionIssuer:STRUCT<
+                  type:STRING,
+                  principalId:STRING,
+                  arn:STRING,
+                  accountId:STRING,
+                  userName:STRING>>>,
+            eventTime STRING,
+            eventSource STRING,
+            eventName STRING,
+            awsRegion STRING,
+            sourceIPAddress STRING,
+            userAgent STRING,
+            errorCode STRING,
+            errorMessage STRING,
+            requestParameters STRING,
+            responseElements STRING,
+            additionalEventData STRING,
+            requestId STRING,
+            eventId STRING,
+            resources ARRAY<STRUCT<
+              ARN:STRING,
+              accountId:STRING,
+              type:STRING>>,
+            eventType STRING,
+            apiVersion STRING,
+            readOnly STRING,
+            recipientAccountId STRING,
+            serviceEventDetails STRING,
+            sharedEventID STRING,
+            vpcEndpointId STRING
+          )
+          PARTITIONED BY(year string, month string, day string)
+          ROW FORMAT SERDE 'com.amazon.emr.hive.serde.CloudTrailSerde'
+          STORED AS INPUTFORMAT 'com.amazon.emr.cloudtrail.CloudTrailInputFormat'
+          OUTPUTFORMAT 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat'
+          LOCATION 's3://my-cloudtrail-logs/cloudtrail-logs/AWSLogs/${AWS::AccountId}/CloudTrail/'
+          TBLPROPERTIES (
+            'has_encrypted_data'='false'
+            'classification'='cloudtrail',
+            'creator'='my-aws-account-id',
+            'cloudtrail:LogFile'='CloudTrail/my_aws_account_id/MyCloudTrailTrail/my_aws_account_id_CloudTrail_MyCloudTrailTrail_20230102T1334Z_oSwKcEph1ZDBNSeC.json.gz',
+            'cloudtrail:TableName'='cloudtrail_logs',
+            'compressionType'='gzip'
+          );
+          WorkGroup: primary
+        - AWS::AccountId: !Ref "AWS::AccountId"
+
   AthenaExecutionRole:
     Type: AWS::IAM::Role
     Properties:
@@ -210,3 +221,15 @@ Resources:
                   - glue:GetTables
                   - glue:GetTableVersion
                 Resource: "*"
+
+Outputs:
+  S3BucketName:
+    Value: !Ref S3Bucket
+  CloudTrailTrailArn:
+    Value: !GetAtt CloudTrailTrail.Arn
+  AthenaBucketName:
+    Value: !Ref AthenaBucket
+  AthenaDBName:
+    Value: !Ref AthenaDBname
+  AthenaTableName:
+    Value: !Ref AthenaTablename
